@@ -2,7 +2,7 @@
  * 备用随机 SVG 图标 - 优化设计
  */
 export const fallbackSVGIcons = [
-  `<svg width="80" height="80" viewBox="0 0 24 24" fill="url(#gradient1)" xmlns="http://www.w3.org/2000/svg">
+    `<svg width="80" height="80" viewBox="0 0 24 24" fill="url(#gradient1)" xmlns="http://www.w3.org/2000/svg">
      <defs>
        <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
          <stop offset="0%" stop-color="#7209b7" />
@@ -11,7 +11,7 @@ export const fallbackSVGIcons = [
      </defs>
      <path d="M12 2L2 12h3v8h6v-6h2v6h6v-8h3L12 2z"/>
    </svg>`,
-  `<svg width="80" height="80" viewBox="0 0 24 24" fill="url(#gradient2)" xmlns="http://www.w3.org/2000/svg">
+    `<svg width="80" height="80" viewBox="0 0 24 24" fill="url(#gradient2)" xmlns="http://www.w3.org/2000/svg">
      <defs>
        <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
          <stop offset="0%" stop-color="#4361ee" />
@@ -21,7 +21,7 @@ export const fallbackSVGIcons = [
      <circle cx="12" cy="12" r="10"/>
      <path d="M12 7v5l3.5 3.5 1.42-1.42L14 11.58V7h-2z" fill="#fff"/>
    </svg>`,
-  `<svg width="80" height="80" viewBox="0 0 24 24" fill="url(#gradient3)" xmlns="http://www.w3.org/2000/svg">
+    `<svg width="80" height="80" viewBox="0 0 24 24" fill="url(#gradient3)" xmlns="http://www.w3.org/2000/svg">
      <defs>
        <linearGradient id="gradient3" x1="0%" y1="0%" x2="100%" y2="100%">
          <stop offset="0%" stop-color="#7209b7" />
@@ -33,18 +33,18 @@ export const fallbackSVGIcons = [
 ];
 
 function getRandomSVG() {
-  return fallbackSVGIcons[Math.floor(Math.random() * fallbackSVGIcons.length)];
+    return fallbackSVGIcons[Math.floor(Math.random() * fallbackSVGIcons.length)];
 }
 
 /**
  * 渲染单个网站卡片（优化版）
  */
 function renderSiteCard(site) {
-  const logoHTML = site.logo
-    ? `<img src="${site.logo}" alt="${site.name}"/>`
-    : getRandomSVG();
+    const logoHTML = site.logo
+        ? `<img src="${site.logo}" alt="${site.name}"/>`
+        : getRandomSVG();
 
-  return `
+    return `
     <div class="channel-card" data-id="${site.id}">
       <div class="channel-number">${site.id}</div>
       <h3 class="channel-title">${site.name || '未命名'}</h3>
@@ -63,30 +63,41 @@ function renderSiteCard(site) {
   `;
 }
 
-  
-  /**
-   * 处理 API 请求
-   */
-  const api = {
+
+/**
+ * 处理 API 请求
+ */
+const api = {
+    // Helper function to check for authentication cookie
+    isAuthenticated(request) {
+        const cookie = request.headers.get('Cookie');
+        return cookie && cookie.includes('auth=true');
+    },
+
     async handleRequest(request, env, ctx) {
         const url = new URL(request.url);
         const path = url.pathname.replace('/api', ''); // 去掉 "/api" 前缀
         const method = request.method;
-        const id = url.pathname.split('/').pop(); // 获取最后一个路径段，作为 id (例如 /api/config/1)
+        const id = url.pathname.split('/').pop(); // 获取最后一个路径段
+
+        // Public endpoints that don't require authentication
+        if (path === '/config' && method === 'GET') {
+            return await this.getConfig(request, env, ctx, url);
+        }
+        if (path === '/config/submit' && method === 'POST') {
+            return await this.submitConfig(request, env, ctx);
+        }
+
+        // All subsequent endpoints require authentication
+        if (!this.isAuthenticated(request)) {
+            return this.errorResponse('Unauthorized', 401);
+        }
+
+        // Protected endpoints
         try {
-            if (path === '/config') {
-                switch (method) {
-                    case 'GET':
-                        return await this.getConfig(request, env, ctx, url);
-                    case 'POST':
-                        return await this.createConfig(request, env, ctx);
-                    default:
-                        return this.errorResponse('Method Not Allowed', 405)
-                }
+            if (path === '/config' && method === 'POST') {
+                return await this.createConfig(request, env, ctx);
             }
-            if (path === '/config/submit' && method === 'POST') {
-              return await this.submitConfig(request, env, ctx);
-           }
             if (path === `/config/${id}` && /^\d+$/.test(id)) {
                 switch (method) {
                     case 'PUT':
@@ -94,7 +105,7 @@ function renderSiteCard(site) {
                     case 'DELETE':
                         return await this.deleteConfig(request, env, ctx, id);
                     default:
-                        return this.errorResponse('Method Not Allowed', 405)
+                        return this.errorResponse('Method Not Allowed', 405);
                 }
             }
             if (path === `/pending/${id}` && /^\d+$/.test(id)) {
@@ -104,7 +115,7 @@ function renderSiteCard(site) {
                     case 'DELETE':
                         return await this.rejectPendingConfig(request, env, ctx, id);
                     default:
-                        return this.errorResponse('Method Not Allowed', 405)
+                        return this.errorResponse('Method Not Allowed', 405);
                 }
             }
             if (path === '/config/import' && method === 'POST') {
@@ -114,184 +125,184 @@ function renderSiteCard(site) {
                 return await this.exportConfig(request, env, ctx);
             }
             if (path === '/pending' && method === 'GET') {
-              return await this.getPendingConfig(request, env, ctx, url);
+                return await this.getPendingConfig(request, env, ctx, url);
             }
             return this.errorResponse('Not Found', 404);
         } catch (error) {
             return this.errorResponse(`Internal Server Error: ${error.message}`, 500);
         }
     },
-      async getConfig(request, env, ctx, url) {
-              const catalog = url.searchParams.get('catalog');
-              const page = parseInt(url.searchParams.get('page') || '1', 10);
-              const pageSize = parseInt(url.searchParams.get('pageSize') || '10', 10);
-              const keyword = url.searchParams.get('keyword');
-              const offset = (page - 1) * pageSize;
-              try {
-                  let query = `SELECT * FROM sites ORDER BY create_time DESC LIMIT ? OFFSET ?`;
-                  let countQuery = `SELECT COUNT(*) as total FROM sites`;
-                  let queryBindParams = [pageSize, offset];
-                  let countQueryParams = [];
-  
-                  if (catalog) {
-                      query = `SELECT * FROM sites WHERE catelog = ? ORDER BY create_time DESC LIMIT ? OFFSET ?`;
-                      countQuery = `SELECT COUNT(*) as total FROM sites WHERE catelog = ?`
-                      queryBindParams = [catalog, pageSize, offset];
-                      countQueryParams = [catalog];
-                  }
-  
-                  if (keyword) {
-                      const likeKeyword = `%${keyword}%`;
-                      query = `SELECT * FROM sites WHERE name LIKE ? OR url LIKE ? OR catelog LIKE ? ORDER BY create_time DESC LIMIT ? OFFSET ?`;
-                      countQuery = `SELECT COUNT(*) as total FROM sites WHERE name LIKE ? OR url LIKE ? OR catelog LIKE ?`;
-                      queryBindParams = [likeKeyword, likeKeyword, likeKeyword, pageSize, offset];
-                      countQueryParams = [likeKeyword, likeKeyword, likeKeyword];
-  
-                      if (catalog) {
-                          query = `SELECT * FROM sites WHERE catelog = ? AND (name LIKE ? OR url LIKE ? OR catelog LIKE ?) ORDER BY create_time DESC LIMIT ? OFFSET ?`;
-                          countQuery = `SELECT COUNT(*) as total FROM sites WHERE catelog = ? AND (name LIKE ? OR url LIKE ? OR catelog LIKE ?)`;
-                          queryBindParams = [catalog, likeKeyword, likeKeyword, likeKeyword, pageSize, offset];
-                          countQueryParams = [catalog, likeKeyword, likeKeyword, likeKeyword];
-                      }
-                  }
-  
-                  const { results } = await env.NAV_DB.prepare(query).bind(...queryBindParams).all();
-                  const countResult = await env.NAV_DB.prepare(countQuery).bind(...countQueryParams).first();
-                  const total = countResult ? countResult.total : 0;
-  
-                return new Response(
-                  JSON.stringify({
-                      code: 200,
-                      data: results,
-                      total,
-                      page,
-                      pageSize
-                  }),
-                  { headers: { 'Content-Type': 'application/json' } }
-              );
-              
-              } catch (e) {
-                  return this.errorResponse(`Failed to fetch config data: ${e.message}`, 500)
-              }
-          },
-        async getPendingConfig(request, env, ctx, url) {
-            const page = parseInt(url.searchParams.get('page') || '1', 10);
-            const pageSize = parseInt(url.searchParams.get('pageSize') || '10', 10);
-            const offset = (page - 1) * pageSize;
-            try {
-                const { results } = await env.NAV_DB.prepare(`
-                        SELECT * FROM pending_sites ORDER BY create_time DESC LIMIT ? OFFSET ?
-                    `).bind(pageSize, offset).all();
-                  const countResult = await env.NAV_DB.prepare(`
-                      SELECT COUNT(*) as total FROM pending_sites
-                      `).first();
-                const total = countResult ? countResult.total : 0;
-                  return new Response(
-                      JSON.stringify({
-                        code: 200,
-                        data: results,
-                          total,
-                        page,
-                        pageSize
-                      }),
-                      {headers: {'Content-Type': 'application/json'}}
-                  );
-            } catch (e) {
-                return this.errorResponse(`Failed to fetch pending config data: ${e.message}`, 500);
+    async getConfig(request, env, ctx, url) {
+        const catalog = url.searchParams.get('catalog');
+        const page = parseInt(url.searchParams.get('page') || '1', 10);
+        const pageSize = parseInt(url.searchParams.get('pageSize') || '10', 10);
+        const keyword = url.searchParams.get('keyword');
+        const offset = (page - 1) * pageSize;
+        try {
+            let query = `SELECT * FROM sites ORDER BY create_time DESC LIMIT ? OFFSET ?`;
+            let countQuery = `SELECT COUNT(*) as total FROM sites`;
+            let queryBindParams = [pageSize, offset];
+            let countQueryParams = [];
+
+            if (catalog) {
+                query = `SELECT * FROM sites WHERE catelog = ? ORDER BY create_time DESC LIMIT ? OFFSET ?`;
+                countQuery = `SELECT COUNT(*) as total FROM sites WHERE catelog = ?`
+                queryBindParams = [catalog, pageSize, offset];
+                countQueryParams = [catalog];
             }
-        },
-        async approvePendingConfig(request, env, ctx, id) {
-            try {
-                const { results } = await env.NAV_DB.prepare('SELECT * FROM pending_sites WHERE id = ?').bind(id).all();
-                if(results.length === 0) {
-                    return this.errorResponse('Pending config not found', 404);
+
+            if (keyword) {
+                const likeKeyword = `%${keyword}%`;
+                query = `SELECT * FROM sites WHERE name LIKE ? OR url LIKE ? OR catelog LIKE ? ORDER BY create_time DESC LIMIT ? OFFSET ?`;
+                countQuery = `SELECT COUNT(*) as total FROM sites WHERE name LIKE ? OR url LIKE ? OR catelog LIKE ?`;
+                queryBindParams = [likeKeyword, likeKeyword, likeKeyword, pageSize, offset];
+                countQueryParams = [likeKeyword, likeKeyword, likeKeyword];
+
+                if (catalog) {
+                    query = `SELECT * FROM sites WHERE catelog = ? AND (name LIKE ? OR url LIKE ? OR catelog LIKE ?) ORDER BY create_time DESC LIMIT ? OFFSET ?`;
+                    countQuery = `SELECT COUNT(*) as total FROM sites WHERE catelog = ? AND (name LIKE ? OR url LIKE ? OR catelog LIKE ?)`;
+                    queryBindParams = [catalog, likeKeyword, likeKeyword, likeKeyword, pageSize, offset];
+                    countQueryParams = [catalog, likeKeyword, likeKeyword, likeKeyword];
                 }
-                 const config = results[0];
-                await env.NAV_DB.prepare(`
-                    INSERT INTO sites (name, url, logo, desc, catelog)
-                    VALUES (?, ?, ?, ?, ?)
-              `).bind(config.name, config.url, config.logo, config.desc, config.catelog).run();
-                await env.NAV_DB.prepare('DELETE FROM pending_sites WHERE id = ?').bind(id).run();
-  
-                 return new Response(JSON.stringify({
-                    code: 200,
-                    message: 'Pending config approved successfully'
-                }),{
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                })
-            }catch(e) {
-                return this.errorResponse(`Failed to approve pending config : ${e.message}`, 500);
             }
-        },
-        async rejectPendingConfig(request, env, ctx, id) {
-            try{
-                await env.NAV_DB.prepare('DELETE FROM pending_sites WHERE id = ?').bind(id).run();
-                return new Response(JSON.stringify({
+
+            const { results } = await env.NAV_DB.prepare(query).bind(...queryBindParams).all();
+            const countResult = await env.NAV_DB.prepare(countQuery).bind(...countQueryParams).first();
+            const total = countResult ? countResult.total : 0;
+
+            return new Response(
+                JSON.stringify({
                     code: 200,
-                    message: 'Pending config rejected successfully',
-                }), {headers: {'Content-Type': 'application/json'}});
-            } catch(e) {
-                return this.errorResponse(`Failed to reject pending config: ${e.message}`, 500);
+                    data: results,
+                    total,
+                    page,
+                    pageSize
+                }),
+                { headers: { 'Content-Type': 'application/json' } }
+            );
+
+        } catch (e) {
+            return this.errorResponse(`Failed to fetch config data: ${e.message}`, 500)
+        }
+    },
+    async getPendingConfig(request, env, ctx, url) {
+        const page = parseInt(url.searchParams.get('page') || '1', 10);
+        const pageSize = parseInt(url.searchParams.get('pageSize') || '10', 10);
+        const offset = (page - 1) * pageSize;
+        try {
+            const { results } = await env.NAV_DB.prepare(`
+                SELECT * FROM pending_sites ORDER BY create_time DESC LIMIT ? OFFSET ?
+            `).bind(pageSize, offset).all();
+            const countResult = await env.NAV_DB.prepare(`
+                SELECT COUNT(*) as total FROM pending_sites
+            `).first();
+            const total = countResult ? countResult.total : 0;
+            return new Response(
+                JSON.stringify({
+                    code: 200,
+                    data: results,
+                    total,
+                    page,
+                    pageSize
+                }),
+                {headers: {'Content-Type': 'application/json'}}
+            );
+        } catch (e) {
+            return this.errorResponse(`Failed to fetch pending config data: ${e.message}`, 500);
+        }
+    },
+    async approvePendingConfig(request, env, ctx, id) {
+        try {
+            const { results } = await env.NAV_DB.prepare('SELECT * FROM pending_sites WHERE id = ?').bind(id).all();
+            if(results.length === 0) {
+                return this.errorResponse('Pending config not found', 404);
             }
-        },
-      async submitConfig(request, env, ctx) {
-          try{
-              const config = await request.json();
-              const { name, url, logo, desc, catelog } = config;
-  
-              if (!name || !url || !catelog ) {
-                  return this.errorResponse('Name, URL and Catelog are required', 400);
-              }
-              await env.NAV_DB.prepare(`
-                  INSERT INTO pending_sites (name, url, logo, desc, catelog)
-                  VALUES (?, ?, ?, ?, ?)
+            const config = results[0];
+            await env.NAV_DB.prepare(`
+                INSERT INTO sites (name, url, logo, desc, catelog)
+                VALUES (?, ?, ?, ?, ?)
+            `).bind(config.name, config.url, config.logo, config.desc, config.catelog).run();
+            await env.NAV_DB.prepare('DELETE FROM pending_sites WHERE id = ?').bind(id).run();
+
+            return new Response(JSON.stringify({
+                code: 200,
+                message: 'Pending config approved successfully'
+            }),{
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+        }catch(e) {
+            return this.errorResponse(`Failed to approve pending config : ${e.message}`, 500);
+        }
+    },
+    async rejectPendingConfig(request, env, ctx, id) {
+        try{
+            await env.NAV_DB.prepare('DELETE FROM pending_sites WHERE id = ?').bind(id).run();
+            return new Response(JSON.stringify({
+                code: 200,
+                message: 'Pending config rejected successfully',
+            }), {headers: {'Content-Type': 'application/json'}});
+        } catch(e) {
+            return this.errorResponse(`Failed to reject pending config: ${e.message}`, 500);
+        }
+    },
+    async submitConfig(request, env, ctx) {
+        try{
+            const config = await request.json();
+            const { name, url, logo, desc, catelog } = config;
+
+            if (!name || !url || !catelog ) {
+                return this.errorResponse('Name, URL and Catelog are required', 400);
+            }
+            await env.NAV_DB.prepare(`
+                INSERT INTO pending_sites (name, url, logo, desc, catelog)
+                VALUES (?, ?, ?, ?, ?)
             `).bind(name, url, logo, desc, catelog).run();
-  
+
             return new Response(JSON.stringify({
-              code: 201,
-              message: 'Config submitted successfully, waiting for admin approve',
+                code: 201,
+                message: 'Config submitted successfully, waiting for admin approve',
             }), {
                 status: 201,
                 headers: { 'Content-Type': 'application/json' },
             })
-          } catch(e) {
-              return this.errorResponse(`Failed to submit config : ${e.message}`, 500);
-          }
-      },
-      
+        } catch(e) {
+            return this.errorResponse(`Failed to submit config : ${e.message}`, 500);
+        }
+    },
+
     async createConfig(request, env, ctx) {
-          try{
-              const config = await request.json();
-              const { name, url, logo, desc, catelog } = config;
-  
-              if (!name || !url || !catelog ) {
-                  return this.errorResponse('Name, URL and Catelog are required', 400);
-              }
-              const insert = await env.NAV_DB.prepare(`
-                    INSERT INTO sites (name, url, logo, desc, catelog)
-                    VALUES (?, ?, ?, ?, ?)
-              `).bind(name, url, logo, desc, catelog).run();
-  
+        try{
+            const config = await request.json();
+            const { name, url, logo, desc, catelog } = config;
+
+            if (!name || !url || !catelog ) {
+                return this.errorResponse('Name, URL and Catelog are required', 400);
+            }
+            const insert = await env.NAV_DB.prepare(`
+                INSERT INTO sites (name, url, logo, desc, catelog)
+                VALUES (?, ?, ?, ?, ?)
+            `).bind(name, url, logo, desc, catelog).run();
+
             return new Response(JSON.stringify({
-              code: 201,
-              message: 'Config created successfully',
-              insert
+                code: 201,
+                message: 'Config created successfully',
+                insert
             }), {
                 status: 201,
                 headers: { 'Content-Type': 'application/json' },
             })
-          } catch(e) {
-              return this.errorResponse(`Failed to create config : ${e.message}`, 500);
-          }
-      },
-  
-      async updateConfig(request, env, ctx, id) {
-          try {
-              const config = await request.json();
-              const { name, url, logo, desc, catelog } = config;
-  
+        } catch(e) {
+            return this.errorResponse(`Failed to create config : ${e.message}`, 500);
+        }
+    },
+
+    async updateConfig(request, env, ctx, id) {
+        try {
+            const config = await request.json();
+            const { name, url, logo, desc, catelog } = config;
+
             const update = await env.NAV_DB.prepare(`
                 UPDATE sites
                 SET name = ?, url = ?, logo = ?, desc = ?, catelog = ?, update_time = CURRENT_TIMESTAMP
@@ -302,136 +313,160 @@ function renderSiteCard(site) {
                 message: 'Config updated successfully',
                 update
             }), { headers: { 'Content-Type': 'application/json' }});
-          } catch (e) {
-              return this.errorResponse(`Failed to update config: ${e.message}`, 500);
-          }
-      },
-  
-      async deleteConfig(request, env, ctx, id) {
-          try{
-              const del = await env.NAV_DB.prepare('DELETE FROM sites WHERE id = ?').bind(id).run();
-              return new Response(JSON.stringify({
-                  code: 200,
-                  message: 'Config deleted successfully',
-                  del
-              }), {headers: {'Content-Type': 'application/json'}});
-          } catch(e) {
-            return this.errorResponse(`Failed to delete config: ${e.message}`, 500);
-          }
-      },
-      async importConfig(request, env, ctx) {
-        try {
-          const jsonData = await request.json();
-  
-          if (!Array.isArray(jsonData)) {
-            return this.errorResponse('Invalid JSON data. Must be an array of site configurations.', 400);
-          }
-  
-          const insertStatements = jsonData.map(item =>
-                env.NAV_DB.prepare(`
-                        INSERT INTO sites (name, url, logo, desc, catelog)
-                        VALUES (?, ?, ?, ?, ?)
-                  `).bind(item.name, item.url, item.logo, item.desc, item.catelog)
-            )
-  
-          // 使用 Promise.all 来并行执行所有插入操作
-          await Promise.all(insertStatements.map(stmt => stmt.run()));
-  
-          return new Response(JSON.stringify({
-              code: 201,
-              message: 'Config imported successfully'
-          }), {
-              status: 201,
-              headers: {'Content-Type': 'application/json'}
-          });
-        } catch (error) {
-          return this.errorResponse(`Failed to import config : ${error.message}`, 500);
+        } catch (e) {
+            return this.errorResponse(`Failed to update config: ${e.message}`, 500);
         }
-      },
-  
-      async exportConfig(request, env, ctx) {
+    },
+
+    async deleteConfig(request, env, ctx, id) {
         try{
-          const { results } = await env.NAV_DB.prepare('SELECT * FROM sites ORDER BY create_time DESC').all();
-          return new Response(JSON.stringify({
-              code: 200,
-              data: results
-          }),{
-              headers: {
-                'Content-Type': 'application/json',
-                'Content-Disposition': 'attachment; filename="config.json"'
-              }
-          });
+            const del = await env.NAV_DB.prepare('DELETE FROM sites WHERE id = ?').bind(id).run();
+            return new Response(JSON.stringify({
+                code: 200,
+                message: 'Config deleted successfully',
+                del
+            }), {headers: {'Content-Type': 'application/json'}});
         } catch(e) {
-          return this.errorResponse(`Failed to export config: ${e.message}`, 500)
+            return this.errorResponse(`Failed to delete config: ${e.message}`, 500);
         }
-      },
-       errorResponse(message, status) {
-          return new Response(JSON.stringify({code: status, message: message}), {
-              status: status,
-              headers: { 'Content-Type': 'application/json' },
-          });
-      }
-    };
-  
-  
-  /**
-   * 处理后台管理页面请求
-   */
-  const admin = {
-  async handleRequest(request, env, ctx) {
-    const url = new URL(request.url);
+    },
+    async importConfig(request, env, ctx) {
+        try {
+            const jsonData = await request.json();
 
-    if (url.pathname === '/admin') {
-      const params = url.searchParams;
-      const name = params.get('name');
-      const password = params.get('password');
+            if (!Array.isArray(jsonData)) {
+                return this.errorResponse('Invalid JSON data. Must be an array of site configurations.', 400);
+            }
 
-          // 从KV中获取凭据
-    const storedUsername = await env.NAV_AUTH.get("admin_username");
-    const storedPassword = await env.NAV_AUTH.get("admin_password");
+            const insertStatements = jsonData.map(item =>
+                env.NAV_DB.prepare(`
+                    INSERT INTO sites (name, url, logo, desc, catelog)
+                    VALUES (?, ?, ?, ?, ?)
+                `).bind(item.name, item.url, item.logo, item.desc, item.catelog)
+            )
 
-    if (name === storedUsername && password === storedPassword) {
-      return this.renderAdminPage();
-    } else if (name || password) {
-      return new Response('未授权访问', {
-        status: 403,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' }
-      });
-    } else {
-      return this.renderLoginPage();
+            // 使用 Promise.all 来并行执行所有插入操作
+            await Promise.all(insertStatements.map(stmt => stmt.run()));
+
+            return new Response(JSON.stringify({
+                code: 201,
+                message: 'Config imported successfully'
+            }), {
+                status: 201,
+                headers: {'Content-Type': 'application/json'}
+            });
+        } catch (error) {
+            return this.errorResponse(`Failed to import config : ${error.message}`, 500);
+        }
+    },
+
+    async exportConfig(request, env, ctx) {
+        try{
+            const { results } = await env.NAV_DB.prepare('SELECT * FROM sites ORDER BY create_time DESC').all();
+            return new Response(JSON.stringify({
+                code: 200,
+                data: results
+            }),{
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Disposition': 'attachment; filename="config.json"'
+                }
+            });
+        } catch(e) {
+            return this.errorResponse(`Failed to export config: ${e.message}`, 500)
+        }
+    },
+    errorResponse(message, status) {
+        return new Response(JSON.stringify({code: status, message: message}), {
+            status: status,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
-    }
-    
-    if (url.pathname.startsWith('/static')) {
-      return this.handleStatic(request, env, ctx);
-    }
-    
-    return new Response('页面不存在', {status: 404});
-  },
-     async handleStatic(request, env, ctx) {
+};
+
+
+/**
+ * 处理后台管理页面请求
+ */
+const admin = {
+    async handleRequest(request, env, ctx) {
+        const url = new URL(request.url);
+
+        if (url.pathname === '/admin') {
+            // 处理 POST 请求用于登录
+            if (request.method === 'POST') {
+                try {
+                    const { username, password } = await request.json();
+                    const storedUsername = env.ADMIN_USERNAME;
+                    const storedPassword = env.ADMIN_PASSWORD;
+
+                    if (username === storedUsername && password === storedPassword) {
+                        // 登录成功，设置一个安全的 HttpOnly cookie
+                        const cookie = `auth=true; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=3600`; // 1小时有效期
+                        return new Response(JSON.stringify({ success: true }), {
+                            status: 200,
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Set-Cookie': cookie,
+                            },
+                        });
+                    } else {
+                        return new Response(JSON.stringify({ success: false, message: '用户名或密码错误' }), {
+                            status: 401,
+                            headers: { 'Content-Type': 'application/json' },
+                        });
+                    }
+                } catch (e) {
+                    return new Response(JSON.stringify({ success: false, message: '无效的请求' }), {
+                        status: 400,
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+                }
+            }
+
+            // 处理 GET 请求，检查 cookie
+            if (request.method === 'GET') {
+                const cookie = request.headers.get('Cookie');
+                if (cookie && cookie.includes('auth=true')) {
+                    return this.renderAdminPage();
+                } else {
+                    return this.renderLoginPage();
+                }
+            }
+
+            return new Response('Method Not Allowed', { status: 405 });
+        }
+
+        if (url.pathname.startsWith('/static')) {
+            return this.handleStatic(request, env, ctx);
+        }
+
+        return new Response('页面不存在', { status: 404 });
+    },
+    async handleStatic(request, env, ctx) {
         const url = new URL(request.url);
         const filePath = url.pathname.replace('/static/', '');
-  
+
         let contentType = 'text/plain';
         if (filePath.endsWith('.css')) {
-           contentType = 'text/css';
+            contentType = 'text/css';
         } else if (filePath.endsWith('.js')) {
-           contentType = 'application/javascript';
+            contentType = 'application/javascript';
         }
-  
+
         try {
             const fileContent = await this.getFileContent(filePath)
             return new Response(fileContent, {
-              headers: { 'Content-Type': contentType }
+                headers: { 'Content-Type': contentType }
             });
         } catch (e) {
-           return new Response('Not Found', {status: 404});
+            return new Response('Not Found', {status: 404});
         }
-  
-      },
+
+    },
     async getFileContent(filePath) {
         const fileContents = {
-           'admin.html': `<!DOCTYPE html>
+            'admin.html': `<!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
@@ -755,7 +790,7 @@ function renderSiteCard(site) {
         color: #fff;
     }
       `,
-          'admin.js': `
+            'admin.js': `
           const configTableBody = document.getElementById('configTableBody');
           const prevPageBtn = document.getElementById('prevPage');
           const nextPageBtn = document.getElementById('nextPage');
@@ -1013,41 +1048,63 @@ function renderSiteCard(site) {
           
           addBtn.addEventListener('click', () => {
             const name = addName.value;
-            const url = addUrl.value;
-            const logo = addLogo.value;
+            let url = addUrl.value.trim();
+            let logo = addLogo.value.trim();
             const desc = addDesc.value;
-             const catelog = addCatelog.value;
-            if(!name ||    !url || !catelog) {
-              showMessage('名称,URL,分类 必填', 'error');
+            const catelog = addCatelog.value;
+
+            if (!name || !url || !catelog) {
+              showMessage('名称, URL, 和分类为必填项', 'error');
               return;
-          }
-          fetch('/api/config', {        method: 'POST',
-          headers: {
-              'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-             name,
-             url,
-             logo,
-             desc,
-              catelog
-          })
-          }).then(res => res.json())
-          .then(data => {
-             if(data.code === 201) {
-                 showMessage('添加成功', 'success');
-                addName.value = '';
-                addUrl.value = '';
-                addLogo.value = '';
-                addDesc.value = '';
-                 addCatelog.value = '';
-                 fetchConfigs();
-             }else {
-                showMessage(data.message, 'error');
-             }
-          }).catch(err => {
-            showMessage('网络错误', 'error');
-          })
+            }
+
+            // 如果URL没有协议头，自动添加 http://
+            if (!url.toLowerCase().startsWith('http://') && !url.toLowerCase().startsWith('https://')) {
+              url = 'http://' + url;
+            }
+
+            // 再次校验补全后的URL
+            let validatedUrl;
+            try {
+              validatedUrl = new URL(url);
+            } catch (_) {
+              showMessage('请输入一个有效的URL', 'error');
+              return;
+            }
+
+            // 如果 logo 为空，则自动生成
+            if (!logo) {
+              logo = 'https://favicon.im/zh/' + validatedUrl.hostname;
+            }
+
+            fetch('/api/config', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                name,
+                url,
+                logo,
+                desc,
+                catelog
+              })
+            }).then(res => res.json())
+              .then(data => {
+                if (data.code === 201) {
+                  showMessage('添加成功', 'success');
+                  addName.value = '';
+                  addUrl.value = '';
+                  addLogo.value = '';
+                  addDesc.value = '';
+                  addCatelog.value = '';
+                  fetchConfigs();
+                } else {
+                  showMessage(data.message, 'error');
+                }
+              }).catch(err => {
+                showMessage('网络错误', 'error');
+              })
           });
           
           importBtn.addEventListener('click', () => {
@@ -1221,19 +1278,19 @@ function renderSiteCard(site) {
           fetchConfigs();
           fetchPendingConfigs();
           `
-    }
-    return fileContents[filePath]
+        }
+        return fileContents[filePath]
     },
-  
+
     async renderAdminPage() {
-    const html = await this.getFileContent('admin.html');
-    return new Response(html, {
-        headers: {'Content-Type': 'text/html; charset=utf-8'}
-    });
+        const html = await this.getFileContent('admin.html');
+        return new Response(html, {
+            headers: {'Content-Type': 'text/html; charset=utf-8'}
+        });
     },
-  
+
     async renderLoginPage() {
-      const html = `<!DOCTYPE html>
+        const html = `<!DOCTYPE html>
       <html lang="zh-CN">
       <head>
         <meta charset="UTF-8">
@@ -1343,49 +1400,70 @@ function renderSiteCard(site) {
             const loginForm = document.getElementById('loginForm');
             const errorMessage = document.getElementById('errorMessage');
             
-            loginForm.addEventListener('submit', function(e) {
+            loginForm.addEventListener('submit', async function(e) {
               e.preventDefault();
+              errorMessage.style.display = 'none';
               
               const username = document.getElementById('username').value;
               const password = document.getElementById('password').value;
               
-              // 重定向到带有凭据的管理页面
-              window.location.href = '/admin?name=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+              try {
+                const response = await fetch('/admin', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ username, password }),
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                  // 登录成功，刷新页面，服务器会通过 cookie 验证并显示管理页面
+                  window.location.reload();
+                } else {
+                  errorMessage.textContent = data.message || '用户名或密码错误';
+                  errorMessage.style.display = 'block';
+                }
+              } catch (error) {
+                errorMessage.textContent = '登录请求失败，请检查网络连接。';
+                errorMessage.style.display = 'block';
+              }
             });
           });
         </script>
       </body>
       </html>`;
-      
-      return new Response(html, {
-        headers: { 'Content-Type': 'text/html; charset=utf-8' }
-      });
+
+        return new Response(html, {
+            headers: { 'Content-Type': 'text/html; charset=utf-8' }
+        });
     }
-  };
-  
-  
-  /**
-   * 优化后的主逻辑：处理请求，返回优化后的 HTML
-   */
-  async function handleRequest(request, env, ctx) {
+};
+
+
+/**
+ * 优化后的主逻辑：处理请求，返回优化后的 HTML
+ */
+async function handleRequest(request, env, ctx) {
     const url = new URL(request.url);
     const catalog = url.searchParams.get('catalog');
 
     let sites = [];
     try {
-      const { results } = await env.NAV_DB.prepare('SELECT * FROM sites ORDER BY create_time').all();
-      sites = results;
+        const { results } = await env.NAV_DB.prepare('SELECT * FROM sites ORDER BY create_time').all();
+        sites = results;
     } catch (e) {
-      return new Response(`Failed to fetch data: ${e.message}`, { status: 500 });
+        return new Response(`Failed to fetch data: ${e.message}`, { status: 500 });
     }
 
     if (!sites || sites.length === 0) {
-      return new Response('No site configuration found.', { status: 404 });
+        return new Response('No site configuration found.', { status: 404 });
     }
 
     // 获取所有分类
     const catalogs = Array.from(new Set(sites.map(s => s.catelog)));
-    
+
     // 根据 URL 参数筛选站点
     const currentCatalog = catalog || catalogs[0];
     const currentSites = catalog ? sites.filter(s => s.catelog === currentCatalog) : sites;
@@ -1612,13 +1690,6 @@ function renderSiteCard(site) {
               </svg>
               添加新书签
             </button>
-            
-            <a href="https://www.wangwangit.com/" target="_blank" class="mt-4 flex items-center px-4 py-2 text-gray-600 hover:text-primary-500 transition duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              访问博客
-            </a>
 
             <a href="/admin" target="_blank" class="mt-4 flex items-center px-4 py-2 text-gray-600 hover:text-primary-500 transition duration-300">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1674,10 +1745,10 @@ function renderSiteCard(site) {
                   <a href="${site.url}" target="_blank" class="block">
                     <div class="flex items-start">
                       <div class="flex-shrink-0 mr-4">
-                        ${site.logo 
-                          ? `<img src="${site.logo}" alt="${site.name}" class="w-10 h-10 rounded-lg object-cover">`
-                          : `<div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-500 to-accent-400 flex items-center justify-center text-white font-bold text-lg">${site.name.charAt(0)}</div>`
-                        }
+                        ${site.logo
+        ? `<img src="${site.logo}" alt="${site.name}" class="w-10 h-10 rounded-lg object-cover">`
+        : `<div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-500 to-accent-400 flex items-center justify-center text-white font-bold text-lg">${site.name.charAt(0)}</div>`
+    }
                       </div>
                       <div class="flex-1 min-w-0">
                         <h3 class="text-base font-medium text-gray-900 truncate">${site.name}</h3>
@@ -2007,23 +2078,23 @@ function renderSiteCard(site) {
     </html>
     `;
 
-return new Response(html, {
-  headers: { 'content-type': 'text/html; charset=utf-8' }
-});
+    return new Response(html, {
+        headers: { 'content-type': 'text/html; charset=utf-8' }
+    });
 }
 
 
 // 导出主模块
 export default {
-async fetch(request, env, ctx) {
-  const url = new URL(request.url);
-  
-  if (url.pathname.startsWith('/api')) {
-    return api.handleRequest(request, env, ctx);
-  } else if (url.pathname === '/admin' || url.pathname.startsWith('/static')) {
-    return admin.handleRequest(request, env, ctx);
-  } else {
-    return handleRequest(request, env, ctx);
-  }
-},
+    async fetch(request, env, ctx) {
+        const url = new URL(request.url);
+
+        if (url.pathname.startsWith('/api')) {
+            return api.handleRequest(request, env, ctx);
+        } else if (url.pathname === '/admin' || url.pathname.startsWith('/static')) {
+            return admin.handleRequest(request, env, ctx);
+        } else {
+            return handleRequest(request, env, ctx);
+        }
+    },
 };
