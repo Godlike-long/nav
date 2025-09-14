@@ -127,9 +127,6 @@ const api = {
             if (path === '/pending' && method === 'GET') {
                 return await this.getPendingConfig(request, env, ctx, url);
             }
-            if (path === '/scrape-description' && method === 'GET') {
-                return await this.getSiteDescription(request, env, ctx);
-            }
             return this.errorResponse('Not Found', 404);
         } catch (error) {
             return this.errorResponse(`Internal Server Error: ${error.message}`, 500);
@@ -379,48 +376,13 @@ const api = {
             return this.errorResponse(`Failed to export config: ${e.message}`, 500)
         }
     },
-      async getSiteDescription(request, env, ctx) {
-        const targetUrl = new URL(request.url).searchParams.get('url');
-        if (!targetUrl) {
-            return this.errorResponse('URL parameter is required', 400);
-        }
-
-        try {
-            const response = await fetch(targetUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                }
-            });
-            
-            // If the fetch fails, return an empty description gracefully
-            if (!response.ok) {
-                return new Response(JSON.stringify({ description: '' }), {
-                    headers: { 'Content-Type': 'application/json' },
-                });
-            }
-
-            const html = await response.text();
-            // Regex to find the meta description content
-            const match = html.match(/<meta\s+name=["']description["']\s+content=(["'])(.*?)\1/i);
-            const description = match && match[2] ? match[2] : '';
-
-            return new Response(JSON.stringify({ description }), {
-                headers: { 'Content-Type': 'application/json' },
-            });
-        } catch (e) {
-            // If any error occurs, return an empty description
-            return new Response(JSON.stringify({ description: '' }), {
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
-      },
-       errorResponse(message, status) {
-          return new Response(JSON.stringify({code: status, message: message}), {
-              status: status,
-              headers: { 'Content-Type': 'application/json' },
-          });
-      }
-    };
+    errorResponse(message, status) {
+        return new Response(JSON.stringify({code: status, message: message}), {
+            status: status,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+};
 
 
 /**
@@ -1084,76 +1046,65 @@ const admin = {
             }
           });
           
-          addBtn.addEventListener('click', async () => {
+          addBtn.addEventListener('click', () => {
             const name = addName.value;
             let url = addUrl.value.trim();
             let logo = addLogo.value.trim();
-            let desc = addDesc.value.trim();
+            const desc = addDesc.value;
             const catelog = addCatelog.value;
 
             if (!name || !url || !catelog) {
-                showMessage('名称, URL, 和分类为必填项', 'error');
-                return;
+              showMessage('名称, URL, 和分类为必填项', 'error');
+              return;
             }
 
+            // 如果URL没有协议头，自动添加 http://
             if (!url.toLowerCase().startsWith('http://') && !url.toLowerCase().startsWith('https://')) {
-                url = 'http://' + url;
+              url = 'http://' + url;
             }
 
+            // 再次校验补全后的URL
             let validatedUrl;
             try {
-                validatedUrl = new URL(url);
+              validatedUrl = new URL(url);
             } catch (_) {
-                showMessage('请输入一个有效的URL', 'error');
-                return;
+              showMessage('请输入一个有效的URL', 'error');
+              return;
             }
 
+            // 如果 logo 为空，则自动生成
             if (!logo) {
-                logo = 'https://favicon.im/zh/' + validatedUrl.hostname;
-            }
-
-            // 如果描述为空，则尝试抓取
-            if (!desc) {
-                try {
-                    const response = await fetch('/api/scrape-description?url=' + encodeURIComponent(url));
-                    const data = await response.json();
-                    if (data.description) {
-                        desc = data.description;
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch description:", e);
-                    // 即使抓取失败也继续，desc 将为空字符串
-                }
+              logo = 'https://favicon.im/zh/' + validatedUrl.hostname;
             }
 
             fetch('/api/config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    name,
-                    url,
-                    logo,
-                    desc,
-                    catelog
-                })
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                name,
+                url,
+                logo,
+                desc,
+                catelog
+              })
             }).then(res => res.json())
-                .then(data => {
-                    if (data.code === 201) {
-                        showMessage('添加成功', 'success');
-                        addName.value = '';
-                        addUrl.value = '';
-                        addLogo.value = '';
-                        addDesc.value = '';
-                        addCatelog.value = '';
-                        fetchConfigs();
-                    } else {
-                        showMessage(data.message, 'error');
-                    }
-                }).catch(err => {
+              .then(data => {
+                if (data.code === 201) {
+                  showMessage('添加成功', 'success');
+                  addName.value = '';
+                  addUrl.value = '';
+                  addLogo.value = '';
+                  addDesc.value = '';
+                  addCatelog.value = '';
+                  fetchConfigs();
+                } else {
+                  showMessage(data.message, 'error');
+                }
+              }).catch(err => {
                 showMessage('网络错误', 'error');
-            })
+              })
           });
           
           importBtn.addEventListener('click', () => {
