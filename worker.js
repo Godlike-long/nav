@@ -329,11 +329,13 @@ const api = {
         try{
             const config = await request.json();
             // 使用 let 关键字，因为 desc 可能会被重新赋值
-            let { name, url, logo, desc, catelog } = config;
+            let { name, url, logo, desc, catelog, sort_order } = config;
 
             if (!name || !url || !catelog ) {
                 return this.errorResponse('Name, URL and Catelog are required', 400);
             }
+
+            sort_order = sort_order || 9999; // 如果未提供，则使用默认值
 
             // 如果描述为空，则调用 fetchSiteMetadata 函数自动抓取
             if (!desc || desc.trim() === '') {
@@ -341,9 +343,9 @@ const api = {
             }
 
             const insert = await env.NAV_DB.prepare(`
-                INSERT INTO sites (name, url, logo, desc, catelog)
-                VALUES (?, ?, ?, ?, ?)
-            `).bind(name, url, logo, desc, catelog).run();
+                INSERT INTO sites (name, url, logo, desc, catelog, sort_order)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `).bind(name, url, logo, desc, catelog, sort_order).run();
 
             return new Response(JSON.stringify({
                 code: 201,
@@ -361,13 +363,19 @@ const api = {
     async updateConfig(request, env, ctx, id) {
         try {
             const config = await request.json();
-            const { name, url, logo, desc, catelog } = config;
+            let { name, url, logo, desc, catelog, sort_order } = config;
+
+            if (!name || !url || !catelog ) {
+                return this.errorResponse('Name, URL and Catelog are required', 400);
+            }
+
+            sort_order = sort_order || 9999; // 如果未提供，则使用默认值
 
             const update = await env.NAV_DB.prepare(`
                 UPDATE sites
-                SET name = ?, url = ?, logo = ?, desc = ?, catelog = ?, update_time = CURRENT_TIMESTAMP
+                SET name = ?, url = ?, logo = ?, desc = ?, catelog = ?, sort_order = ?, update_time = CURRENT_TIMESTAMP
                 WHERE id = ?
-            `).bind(name, url, logo, desc, catelog, id).run();
+            `).bind(name, url, logo, desc, catelog, sort_order, id).run();
             return new Response(JSON.stringify({
                 code: 200,
                 message: 'Config updated successfully',
@@ -422,7 +430,7 @@ const api = {
 
     async exportConfig(request, env, ctx) {
         try{
-            const { results } = await env.NAV_DB.prepare('SELECT * FROM sites ORDER BY create_time DESC').all();
+            const { results } = await env.NAV_DB.prepare('SELECT * FROM sites ORDER BY sort_order ASC, create_time DESC').all();
             return new Response(JSON.stringify({
                 code: 200,
                 data: results
@@ -551,6 +559,7 @@ const admin = {
             <input type="text" id="addLogo" placeholder="Logo(为空时自动获取)">
             <input type="text" id="addDesc" placeholder="Description(为空时自动抓取)">
             <input type="text" id="addCatelog" placeholder="Catelog">
+            <input type="number" id="addSortOrder" placeholder="排序值(可选)">
             <button id="addBtn">添加</button>
           </div>
           <div id="message" style="display: none;padding:1rem;border-radius: 0.5rem;margin-bottom: 1rem;"></div>
@@ -565,6 +574,7 @@ const admin = {
                             <thead>
                                 <tr>
                                   <th>ID</th>
+                                  <th>排序值</th>
                                   <th>Name</th>
                                   <th>URL</th>
                                   <th>Logo</th>
@@ -871,6 +881,7 @@ const admin = {
           const addLogo = document.getElementById('addLogo');
           const addDesc = document.getElementById('addDesc');
           const addCatelog = document.getElementById('addCatelog');
+          const addSortOrder = document.getElementById('addSortOrder');
           
           const importBtn = document.getElementById('importBtn');
           const importFile = document.getElementById('importFile');
@@ -934,6 +945,8 @@ const admin = {
                 <input type="text" id="editDesc"><br>
                 <label for="editCatelog">分类:</label>
                 <input type="text" id="editCatelog" required><br>
+                <label for="editSortOrder">排序值:</label>
+                <input type="number" id="editSortOrder" required><br>
                 <button type="submit">保存</button>
               </form>
             </div>
@@ -954,6 +967,7 @@ const admin = {
             const logo = document.getElementById('editLogo').value;
             const desc = document.getElementById('editDesc').value;
             const catelog = document.getElementById('editCatelog').value;
+            const sort_order = document.getElementById('editSortOrder').value;
           
             fetch(\`/api/config/\${id}\`, {
               method: 'PUT',
@@ -965,7 +979,8 @@ const admin = {
                 url,
                 logo,
                 desc,
-                catelog
+                catelog,
+                sort_order
               })
             }).then(res => res.json())
               .then(data => {
@@ -1008,13 +1023,14 @@ const admin = {
           function renderConfig(configs) {
           configTableBody.innerHTML = '';
            if (configs.length === 0) {
-                configTableBody.innerHTML = '<tr><td colspan="7">没有配置数据</td></tr>';
+                configTableBody.innerHTML = '<tr><td colspan="8">没有配置数据</td></tr>';
                 return
             }
           configs.forEach(config => {
               const row = document.createElement('tr');
                row.innerHTML = \`
                  <td>\${config.id}</td>
+                 <td>\${config.sort_order}</td>
                   <td>\${config.name}</td>
                   <td><a href="\${config.url}" target="_blank">\${config.url}</a></td>
                   <td>\${config.logo ? \`<img src="\${config.logo}" style="width:30px;" />\` : 'N/A'}</td>
@@ -1049,11 +1065,12 @@ const admin = {
           function handleEdit(id) {
                const row = document.querySelector(\`#configTableBody tr:nth-child(\${Array.from(configTableBody.children).findIndex(tr => tr.querySelector('.edit-btn[data-id="'+ id +'"]')) + 1})\`);
             if (!row) return showMessage('找不到数据','error');
-            const name = row.querySelector('td:nth-child(2)').innerText;
-            const url = row.querySelector('td:nth-child(3) a').innerText;
-            const logo = row.querySelector('td:nth-child(4) img')?.src || '';
-            const desc = row.querySelector('td:nth-child(5)').innerText === 'N/A' ? '' : row.querySelector('td:nth-child(5)').innerText;
-            const catelog = row.querySelector('td:nth-child(6)').innerText;
+            const sort_order = row.querySelector('td:nth-child(2)').innerText;
+            const name = row.querySelector('td:nth-child(3)').innerText;
+            const url = row.querySelector('td:nth-child(4) a').innerText;
+            const logo = row.querySelector('td:nth-child(5) img')?.src || '';
+            const desc = row.querySelector('td:nth-child(6)').innerText === 'N/A' ? '' : row.querySelector('td:nth-child(5)').innerText;
+            const catelog = row.querySelector('td:nth-child(7)').innerText;
           
           
             // 填充表单数据
@@ -1063,6 +1080,7 @@ const admin = {
             document.getElementById('editLogo').value = logo;
             document.getElementById('editDesc').value = desc;
             document.getElementById('editCatelog').value = catelog;
+            document.getElementById('editSortOrder').value = sort_order;
             editModal.style.display = 'block';
           }
           function handleDelete(id) {
@@ -1112,6 +1130,7 @@ const admin = {
             let logo = addLogo.value.trim();
             const desc = addDesc.value;
             const catelog = addCatelog.value;
+            const sort_order = addSortOrder.value ? parseInt(addSortOrder.value, 10) : 9999;
 
             if (!name || !url || !catelog) {
               showMessage('名称, URL, 和分类为必填项', 'error');
@@ -1147,7 +1166,8 @@ const admin = {
                 url,
                 logo,
                 desc,
-                catelog
+                catelog,
+                sort_order
               })
             }).then(res => res.json())
               .then(data => {
@@ -1158,6 +1178,7 @@ const admin = {
                   addLogo.value = '';
                   addDesc.value = '';
                   addCatelog.value = '';
+                  addSortOrder.value = '';
                   fetchConfigs();
                 } else {
                   showMessage(data.message, 'error');
@@ -1511,7 +1532,7 @@ async function handleRequest(request, env, ctx) {
 
     let sites = [];
     try {
-        const { results } = await env.NAV_DB.prepare('SELECT * FROM sites ORDER BY create_time').all();
+        const { results } = await env.NAV_DB.prepare('SELECT * FROM sites ORDER BY sort_order ASC, create_time DESC').all();
         sites = results;
     } catch (e) {
         return new Response(`Failed to fetch data: ${e.message}`, { status: 500 });
