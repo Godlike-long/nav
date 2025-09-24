@@ -74,6 +74,49 @@ const api = {
         return cookie && cookie.includes('auth=true');
     },
 
+    /**
+     * 新增：抓取网站元数据（描述和标题）
+     * @param {string} url 要抓取的网站URL
+     * @returns {Promise<string>} 网站的描述或标题，如果抓取失败则返回空字符串
+     */
+    async fetchSiteMetadata(url) {
+        try {
+            // 使用 fetch API 获取目标网站的 HTML
+            const response = await fetch(url, {
+                headers: {
+                    // 伪装成浏览器，避免一些网站拦截机器人请求
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+            });
+
+            // 确保请求成功
+            if (!response.ok) {
+                console.error(`Failed to fetch ${url}, status: ${response.status}`);
+                return '';
+            }
+
+            const html = await response.text();
+
+            // 优先使用正则表达式匹配 description meta 标签
+            let match = html.match(/<meta\s+name=["']description["']\s+content=["'](.*?)["']/i);
+            if (match && match[1]) {
+                return match[1].trim(); // 返回匹配到的描述内容
+            }
+
+            // 如果没有 description，则尝试匹配 title 标签作为备用
+            match = html.match(/<title>(.*?)<\/title>/i);
+            if (match && match[1]) {
+                return match[1].trim(); // 返回匹配到的标题内容
+            }
+
+            return ''; // 如果都找不到，返回空字符串
+        } catch (error) {
+            console.error(`Error fetching metadata for ${url}:`, error);
+            return ''; // 发生任何错误都安全地返回空字符串
+        }
+    },
+
+
     async handleRequest(request, env, ctx) {
         const url = new URL(request.url);
         const path = url.pathname.replace('/api', ''); // 去掉 "/api" 前缀
@@ -247,14 +290,23 @@ const api = {
             return this.errorResponse(`Failed to reject pending config: ${e.message}`, 500);
         }
     },
+
+    // --- 修改点 1 ---
     async submitConfig(request, env, ctx) {
         try{
             const config = await request.json();
-            const { name, url, logo, desc, catelog } = config;
+            // 使用 let 关键字，因为 desc 可能会被重新赋值
+            let { name, url, logo, desc, catelog } = config;
 
             if (!name || !url || !catelog ) {
                 return this.errorResponse('Name, URL and Catelog are required', 400);
             }
+
+            // 如果描述为空，则调用 fetchSiteMetadata 函数自动抓取
+            if (!desc || desc.trim() === '') {
+                desc = await this.fetchSiteMetadata(url);
+            }
+
             await env.NAV_DB.prepare(`
                 INSERT INTO pending_sites (name, url, logo, desc, catelog)
                 VALUES (?, ?, ?, ?, ?)
@@ -272,14 +324,22 @@ const api = {
         }
     },
 
+    // --- 修改点 2 ---
     async createConfig(request, env, ctx) {
         try{
             const config = await request.json();
-            const { name, url, logo, desc, catelog } = config;
+            // 使用 let 关键字，因为 desc 可能会被重新赋值
+            let { name, url, logo, desc, catelog } = config;
 
             if (!name || !url || !catelog ) {
                 return this.errorResponse('Name, URL and Catelog are required', 400);
             }
+
+            // 如果描述为空，则调用 fetchSiteMetadata 函数自动抓取
+            if (!desc || desc.trim() === '') {
+                desc = await this.fetchSiteMetadata(url);
+            }
+
             const insert = await env.NAV_DB.prepare(`
                 INSERT INTO sites (name, url, logo, desc, catelog)
                 VALUES (?, ?, ?, ?, ?)
