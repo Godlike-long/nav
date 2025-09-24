@@ -75,7 +75,32 @@ const api = {
     },
 
     /**
-     * 新增：抓取网站元数据（描述和标题）
+     * 新增：检查 URL 是否真实可访问
+     * @param {string} url 要检查的 URL
+     * @returns {Promise<boolean>} 如果 URL 可访问则返回 true，否则返回 false
+     */
+    async isUrlAccessible(url) {
+        try {
+            // 使用 HEAD 方法，这比 GET 更快，因为它只请求头部信息
+            const response = await fetch(url, {
+                method: 'HEAD',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+            });
+
+            // response.ok 为 true 表示状态码在 200-299 范围内
+            // fetch 默认会跟随重定向，所以 3xx 状态码也会被处理
+            return response.ok;
+        } catch (error) {
+            // 如果 fetch 抛出错误 (例如 DNS 解析失败、网络问题)，说明 URL 不可访问
+            console.error(`URL accessibility check failed for ${url}:`, error.message);
+            return false;
+        }
+    },
+
+    /**
+     * 抓取网站元数据（描述和标题）
      * @param {string} url 要抓取的网站URL
      * @returns {Promise<string>} 网站的描述或标题，如果抓取失败则返回空字符串
      */
@@ -123,7 +148,6 @@ const api = {
         const method = request.method;
         const id = url.pathname.split('/').pop(); // 获取最后一个路径段
 
-        // Public endpoints that don't require authentication
         if (path === '/config' && method === 'GET') {
             return await this.getConfig(request, env, ctx, url);
         }
@@ -131,12 +155,10 @@ const api = {
             return await this.submitConfig(request, env, ctx);
         }
 
-        // All subsequent endpoints require authentication
         if (!this.isAuthenticated(request)) {
             return this.errorResponse('Unauthorized', 401);
         }
 
-        // Protected endpoints
         try {
             if (path === '/config' && method === 'POST') {
                 return await this.createConfig(request, env, ctx);
@@ -293,16 +315,21 @@ const api = {
 
     // --- 修改点 1 ---
     async submitConfig(request, env, ctx) {
-        try{
+        try {
             const config = await request.json();
             // 使用 let 关键字，因为 desc 可能会被重新赋值
             let { name, url, logo, desc, catelog } = config;
 
-            if (!name || !url || !catelog ) {
+            if (!name || !url || !catelog) {
                 return this.errorResponse('Name, URL and Catelog are required', 400);
             }
 
-            // 如果描述为空，则调用 fetchSiteMetadata 函数自动抓取
+            // --- 新增：真实可访问性验证 ---
+            if (!(await this.isUrlAccessible(url))) {
+                return this.errorResponse('URL is not accessible or does not exist.', 400);
+            }
+            // -----------------------------
+
             if (!desc || desc.trim() === '') {
                 desc = await this.fetchSiteMetadata(url);
             }
@@ -319,23 +346,27 @@ const api = {
                 status: 201,
                 headers: { 'Content-Type': 'application/json' },
             })
-        } catch(e) {
+        } catch (e) {
             return this.errorResponse(`Failed to submit config : ${e.message}`, 500);
         }
     },
 
     // --- 修改点 2 ---
     async createConfig(request, env, ctx) {
-        try{
+        try {
             const config = await request.json();
-            // 使用 let 关键字，因为 desc 可能会被重新赋值
             let { name, url, logo, desc, catelog } = config;
 
-            if (!name || !url || !catelog ) {
+            if (!name || !url || !catelog) {
                 return this.errorResponse('Name, URL and Catelog are required', 400);
             }
 
-            // 如果描述为空，则调用 fetchSiteMetadata 函数自动抓取
+            // --- 新增：真实可访问性验证 ---
+            if (!(await this.isUrlAccessible(url))) {
+                return this.errorResponse('URL is not accessible or does not exist.', 400);
+            }
+            // -----------------------------
+
             if (!desc || desc.trim() === '') {
                 desc = await this.fetchSiteMetadata(url);
             }
@@ -353,15 +384,22 @@ const api = {
                 status: 201,
                 headers: { 'Content-Type': 'application/json' },
             })
-        } catch(e) {
+        } catch (e) {
             return this.errorResponse(`Failed to create config : ${e.message}`, 500);
         }
     },
 
+    // --- 修改点 3 ---
     async updateConfig(request, env, ctx, id) {
         try {
             const config = await request.json();
             const { name, url, logo, desc, catelog } = config;
+
+            // --- 新增：真实可访问性验证 ---
+            if (!(await this.isUrlAccessible(url))) {
+                return this.errorResponse('URL is not accessible or does not exist.', 400);
+            }
+            // -----------------------------
 
             const update = await env.NAV_DB.prepare(`
                 UPDATE sites
@@ -372,7 +410,7 @@ const api = {
                 code: 200,
                 message: 'Config updated successfully',
                 update
-            }), { headers: { 'Content-Type': 'application/json' }});
+            }), { headers: { 'Content-Type': 'application/json' } });
         } catch (e) {
             return this.errorResponse(`Failed to update config: ${e.message}`, 500);
         }
