@@ -764,14 +764,22 @@ const admin = {
         margin-bottom: 20px;
         justify-content: flex-end;
     }
-    
     .add-new {
-        display: flex;
-        gap: 10px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
         margin-bottom: 20px;
+        align-items: center;
     }
-    .add-new > input {
-        flex: 1;
+    #addBtn {
+        grid-column: -1;
+        justify-self: end;
+    }
+    @media (max-width: 768px) {
+        #addBtn {
+            grid-column: 1 / -1;
+            margin-top: 10px;
+        }
     }
     input[type="text"] {
         padding: 10px;
@@ -807,12 +815,18 @@ const admin = {
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 20px;
+        table-layout: fixed;
+        word-break: break-all;
     }
     th, td {
         border: 1px solid #dee2e6;
         padding: 10px;
         text-align: left;
-        color: #495057; /* 表格文字颜色 */
+        color: #495057;
+    }
+    #configTable th:nth-child(1),
+    #configTable th:nth-child(2) {
+        width: 80px;
     }
     th {
         background-color: #f2f2f2;
@@ -825,6 +839,7 @@ const admin = {
     .actions {
         display: flex;
         gap: 5px;
+        justify-content: center;
     }
     .actions button {
         padding: 5px 8px;
