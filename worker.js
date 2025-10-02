@@ -1078,13 +1078,14 @@ const admin = {
           }
           
           function handleEdit(id) {
-               const row = document.querySelector(\`#configTableBody tr:nth-child(\${Array.from(configTableBody.children).findIndex(tr => tr.querySelector('.edit-btn[data-id="'+ id +'"]')) + 1})\`);
+              const btn = configTableBody.querySelector('.edit-btn[data-id="' + id + '"]');
+              const row = btn ? btn.closest('tr') : null;
             if (!row) return showMessage('找不到数据','error');
             const sort_order = row.querySelector('td:nth-child(2)').innerText;
             const name = row.querySelector('td:nth-child(3)').innerText;
             const url = row.querySelector('td:nth-child(4) a').innerText;
             const logo = row.querySelector('td:nth-child(5) img')?.src || '';
-            const desc = row.querySelector('td:nth-child(6)').innerText === 'N/A' ? '' : row.querySelector('td:nth-child(5)').innerText;
+            const desc = row.querySelector('td:nth-child(6)').innerText === 'N/A' ? '' : row.querySelector('td:nth-child(6)').innerText;
             const catelog = row.querySelector('td:nth-child(7)').innerText;
           
           
